@@ -822,6 +822,8 @@ void PrintProtoDtsMessage(Printer *printer, const Descriptor *desc, const FileDe
     printer->Print("\n");
   }
   printer->Print(vars,
+                "toObject(): $class_name$.AsObject;\n"
+                "static fromObject: (obj: Partial<$class_name$.AsObject>) => $class_name$;\n"
                 "serializeBinary(): Uint8Array;\n"
                 "toObject(includeInstance?: boolean): $class_name$.AsObject;\n"
                 "static toObject(includeInstance: boolean, msg: $class_name$): $class_name$.AsObject;\n"
