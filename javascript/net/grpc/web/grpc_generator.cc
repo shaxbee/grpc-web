@@ -501,7 +501,7 @@ void PrintTypescriptFile(Printer* printer, const FileDescriptor* file,
                          "this.hostname_ +\n"
                          "  '/$package_dot$$service_name$/$method_name$',\n"
                          "request,\n"
-                         "metadata,\n"
+                         "metadata || {},\n"
                          "this.methodInfo$method_name$);\n");
           printer->Outdent();
           printer->Outdent();
@@ -512,7 +512,7 @@ void PrintTypescriptFile(Printer* printer, const FileDescriptor* file,
           printer->Print(vars,
                          "request: $input_type$,\n"
                          "metadata?: grpcWeb.Metadata,\n"
-                         "callback?: (err: grpcWeb.Error,\n"
+                         "callback: (err: grpcWeb.Error,\n"
                          "           response: $output_type$) => void) {\n");
           printer->Print(vars, "return this.client_.rpcCall(\n");
           printer->Indent();
@@ -520,7 +520,7 @@ void PrintTypescriptFile(Printer* printer, const FileDescriptor* file,
                          "this.hostname_ +\n"
                          "  '/$package_dot$$service_name$/$method_name$',\n"
                          "request,\n"
-                         "metadata,\n"
+                         "metadata || {},\n"
                          "this.methodInfo$method_name$,\n"
                          "callback);\n");
           printer->Outdent();
@@ -579,8 +579,8 @@ void PrintGrpcWebDtsClientClass(Printer* printer, const FileDescriptor* file, co
             printer->Indent();
             printer->Print(vars,
                            "request: $input_type$,\n"
-                           "metadata?: grpcWeb.Metadata,\n"
-                           "callback?: (err: grpcWeb.Error,\n"
+                           "metadata: grpcWeb.Metadata | undefined,\n"
+                           "callback: (err: grpcWeb.Error,\n"
                            "           response: $output_type$) => void\n");
             printer->Outdent();
             printer->Print(vars,
@@ -797,7 +797,7 @@ void PrintUnaryCall(Printer* printer, std::map<string, string> vars) {
       " *     request proto\n"
       " * @param {?Object<string, string>} metadata User defined\n"
       " *     call metadata\n"
-      " * @param {?function(?grpc.web.Error,"
+      " * @param {function(?grpc.web.Error,"
       " ?proto.$out$)}\n"
       " *     callback The callback function(error, response)\n"
       " * @return {!grpc.web.ClientReadableStream<!proto.$out$>|undefined}\n"
