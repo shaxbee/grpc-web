@@ -21,6 +21,7 @@
 #include <google/protobuf/descriptor.h>
 #include <google/protobuf/io/printer.h>
 #include <google/protobuf/io/zero_copy_stream.h>
+#include <google/protobuf/descriptor.pb.h>
 #include <algorithm>
 
 using google::protobuf::Descriptor;
@@ -272,9 +273,28 @@ string JSFieldType(const FieldDescriptor *desc, const FileDescriptor *file)
   }
   if (desc->is_repeated())
   {
-    js_field_type += "[]";
+    js_field_type = "Array<" + js_field_type + ">";
   }
   return js_field_type;
+}
+
+string AsObjectFieldType(const FieldDescriptor *desc, const FileDescriptor *file) {
+  if (desc->type() != FieldDescriptor::TYPE_MESSAGE) {
+    return JSFieldType(desc, file);
+  };
+
+  if (desc->is_map()) {
+    const Descriptor* message = desc->message_type();
+    string key_type = AsObjectFieldType(message->field(0), file);
+    string value_type = AsObjectFieldType(message->field(1), file);
+    return "Array<[" + key_type + ", " + value_type + "]>";
+  };
+  
+  string field_type = JSMessageType(desc->message_type(), file) + ".AsObject";
+  if (desc->is_repeated()) {
+    field_type = "Array<" + field_type + ">";
+  }
+  return field_type;
 }
 
 string JSFieldName(const FieldDescriptor *desc)
@@ -691,19 +711,25 @@ void PrintProtoDtsMessage(Printer *printer, const Descriptor *desc, const FileDe
     const FieldDescriptor* field = desc->field(i);
     vars["js_field_name"] = JSFieldName(field);
     vars["js_field_type"] = JSFieldType(field, file);
-    if (field->type() != FieldDescriptor::TYPE_MESSAGE) {
-      printer->Print(vars, "get$js_field_name$(): $js_field_type$;\n");
-    } else {
-      printer->Print(vars, "get$js_field_name$(): $js_field_type$ | undefined;\n");
-    }
-    if (field->type() != FieldDescriptor::TYPE_MESSAGE) {
-      printer->Print(vars, "set$js_field_name$(value: $js_field_type$): void;\n");
-    } else if (!field->is_map()) {
-      printer->Print(vars, "set$js_field_name$(value?: $js_field_type$): void;\n");
+    if (field->type() == FieldDescriptor::TYPE_MESSAGE && !field->is_repeated()) {
+      printer->Print(vars, "has$js_field_name$(): boolean;\n");
     }
     if (field->type() == FieldDescriptor::TYPE_MESSAGE || field->is_repeated()) {
       printer->Print(vars, "clear$js_field_name$(): void;\n");
     }
+    if (field->type() != FieldDescriptor::TYPE_MESSAGE || field->is_repeated()) {
+      printer->Print(vars, "get$js_field_name$(): $js_field_type$;\n");
+    } else {
+      printer->Print(vars, "get$js_field_name$(): $js_field_type$ | undefined;\n");
+    }
+    if (!field->is_map()) {
+      if (field->type() != FieldDescriptor::TYPE_MESSAGE || field->is_repeated()) {
+        printer->Print(vars, "set$js_field_name$(value: $js_field_type$): void;\n");
+      } else {
+        printer->Print(vars, "set$js_field_name$(value?: $js_field_type$): void;\n");
+      }
+    }
+    printer->Print("\n");
   }
   printer->Print(vars,
                 "serializeBinary(): Uint8Array;\n"
@@ -722,22 +748,20 @@ void PrintProtoDtsMessage(Printer *printer, const Descriptor *desc, const FileDe
   for (int i = 0; i < desc->field_count(); i++) {
     const FieldDescriptor* field = desc->field(i);
     vars["js_field_name"] = CamelCaseJSFieldName(field);
-    if (field->type() != FieldDescriptor::TYPE_MESSAGE) {
-      vars["js_field_type"] = JSFieldType(field, file);
-      printer->Print(vars, "$js_field_name$: $js_field_type$;\n");
+    vars["js_field_type"] = AsObjectFieldType(field, file);
+    if (field->type() != FieldDescriptor::TYPE_MESSAGE || field->is_repeated()) {
+      printer->Print(vars, "$js_field_name$: $js_field_type$,\n");
     } else {
-      string js_field_type = JSMessageType(field->message_type(), file) + ".AsObject";
-      if (field->is_repeated()) {
-        js_field_type += "[]";
-      }
-      vars["js_field_type"] = js_field_type;
-      printer->Print(vars, "$js_field_name$?: $js_field_type$;\n");
+      printer->Print(vars, "$js_field_name$?: $js_field_type$,\n");
     }
   }
   printer->Outdent();
   printer->Print("}\n");
 
   for (int i = 0; i < desc->nested_type_count(); i++) {
+    if (desc->options().map_entry()) {
+      continue;
+    }
     printer->Print("\n");
     PrintProtoDtsMessage(printer, desc->nested_type(i), file);
   }
